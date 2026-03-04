@@ -2,13 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Key, Eye, EyeOff, Save, Trash2, CheckCircle2, XCircle } from "lucide-react";
+import {
+  Shield, Key, Eye, EyeOff, Save, Trash2,
+  CheckCircle2, XCircle, Zap, Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import type { User, SystemKeysResponse, SystemKeyStatus } from "@/types";
+
+const TESTABLE_KEYS = new Set([
+  "openai_api_key", "anthropic_api_key", "gemini_api_key",
+  "stability_api_key", "elevenlabs_api_key", "resend_api_key",
+]);
+
+interface TestResult {
+  success: boolean;
+  message: string;
+}
 
 export default function AdminSettingsPage() {
   const router = useRouter();
@@ -19,6 +32,8 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [testing, setTesting] = useState<Record<string, boolean>>({});
+  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
 
   useEffect(() => {
     api.get<User>("/auth/me").then((u) => {
@@ -46,6 +61,7 @@ export default function AdminSettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     setMessage(null);
+    setTestResults({});
     try {
       const toUpdate = Object.entries(values)
         .filter(([, v]) => v.trim() !== "")
@@ -74,10 +90,27 @@ export default function AdminSettingsPage() {
   const handleDelete = async (keyName: string) => {
     try {
       await api.delete(`/admin/settings/keys/${keyName}`);
+      setTestResults((prev) => { const n = { ...prev }; delete n[keyName]; return n; });
       await loadKeys();
       setMessage({ type: "success", text: "Key removed." });
     } catch {
       setMessage({ type: "error", text: "Failed to remove key." });
+    }
+  };
+
+  const handleTest = async (keyName: string) => {
+    setTesting((prev) => ({ ...prev, [keyName]: true }));
+    setTestResults((prev) => { const n = { ...prev }; delete n[keyName]; return n; });
+    try {
+      const result = await api.post<{ success: boolean; message: string }>(
+        "/admin/settings/keys/test",
+        { key_name: keyName }
+      );
+      setTestResults((prev) => ({ ...prev, [keyName]: result }));
+    } catch {
+      setTestResults((prev) => ({ ...prev, [keyName]: { success: false, message: "Test request failed." } }));
+    } finally {
+      setTesting((prev) => ({ ...prev, [keyName]: false }));
     }
   };
 
@@ -136,7 +169,7 @@ export default function AdminSettingsPage() {
             </CardTitle>
             <CardDescription>{group.description}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
             {keys
               .filter((k) => group.keys.includes(k.key))
               .map((keyItem) => (
@@ -163,21 +196,53 @@ export default function AdminSettingsPage() {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">{keyItem.description}</p>
-                  <div className="relative">
-                    <Input
-                      type={visible[keyItem.key] ? "text" : "password"}
-                      placeholder={keyItem.is_set ? "Enter new value to replace" : "Enter API key"}
-                      value={values[keyItem.key] || ""}
-                      onChange={(e) => setValues({ ...values, [keyItem.key]: e.target.value })}
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => setVisible({ ...visible, [keyItem.key]: !visible[keyItem.key] })}
-                    >
-                      {visible[keyItem.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={visible[keyItem.key] ? "text" : "password"}
+                        placeholder={keyItem.is_set ? "Enter new value to replace" : "Enter API key"}
+                        value={values[keyItem.key] || ""}
+                        onChange={(e) => setValues({ ...values, [keyItem.key]: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                        onClick={() => setVisible({ ...visible, [keyItem.key]: !visible[keyItem.key] })}
+                      >
+                        {visible[keyItem.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {TESTABLE_KEYS.has(keyItem.key) && keyItem.is_set && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTest(keyItem.key)}
+                        disabled={testing[keyItem.key]}
+                        className="shrink-0 h-10"
+                      >
+                        {testing[keyItem.key] ? (
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Zap className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        Test
+                      </Button>
+                    )}
                   </div>
+                  {testResults[keyItem.key] && (
+                    <div className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${
+                      testResults[keyItem.key].success
+                        ? "border-green-500/30 bg-green-500/10 text-green-400"
+                        : "border-red-500/30 bg-red-500/10 text-red-400"
+                    }`}>
+                      {testResults[keyItem.key].success ? (
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      ) : (
+                        <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      )}
+                      <span>{testResults[keyItem.key].message}</span>
+                    </div>
+                  )}
                 </div>
               ))}
           </CardContent>

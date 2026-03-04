@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -106,3 +107,98 @@ async def delete_system_key(key_name: str, db: DB, admin: SuperAdmin):
         await db.delete(setting)
         await db.commit()
     return {"status": "ok"}
+
+
+TEST_ENDPOINTS = {
+    "openai_api_key": {
+        "url": "https://api.openai.com/v1/models",
+        "method": "GET",
+        "auth_header": "Bearer",
+    },
+    "anthropic_api_key": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "auth_header": "x-api-key",
+        "body": {"model": "claude-3-haiku-20240307", "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}]},
+        "extra_headers": {"anthropic-version": "2023-06-01"},
+    },
+    "gemini_api_key": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models?key={key}",
+        "method": "GET",
+        "auth_header": None,
+    },
+    "stability_api_key": {
+        "url": "https://api.stability.ai/v1/user/account",
+        "method": "GET",
+        "auth_header": "Bearer",
+    },
+    "elevenlabs_api_key": {
+        "url": "https://api.elevenlabs.io/v1/user",
+        "method": "GET",
+        "auth_header": "xi-api-key",
+    },
+    "resend_api_key": {
+        "url": "https://api.resend.com/api-keys",
+        "method": "GET",
+        "auth_header": "Bearer",
+    },
+}
+
+
+class TestKeyRequest(BaseModel):
+    key_name: str
+
+
+class TestKeyResponse(BaseModel):
+    key_name: str
+    success: bool
+    message: str
+
+
+@router.post("/settings/keys/test", response_model=TestKeyResponse)
+async def test_system_key(body: TestKeyRequest, db: DB, admin: SuperAdmin):
+    if body.key_name not in TEST_ENDPOINTS:
+        return TestKeyResponse(key_name=body.key_name, success=False, message="No test available for this key.")
+
+    result = await db.execute(select(SystemSetting).where(SystemSetting.key == body.key_name))
+    setting = result.scalar_one_or_none()
+    if not setting or not setting.value_enc:
+        return TestKeyResponse(key_name=body.key_name, success=False, message="Key not configured.")
+
+    api_key = decrypt_value(setting.value_enc)
+    config = TEST_ENDPOINTS[body.key_name]
+
+    try:
+        url = config["url"].replace("{key}", api_key) if "{key}" in config["url"] else config["url"]
+        headers: dict[str, str] = {}
+        if config["auth_header"] == "Bearer":
+            headers["Authorization"] = f"Bearer {api_key}"
+        elif config["auth_header"] == "x-api-key":
+            headers["x-api-key"] = api_key
+        elif config["auth_header"] == "xi-api-key":
+            headers["xi-api-key"] = api_key
+        if config.get("extra_headers"):
+            headers.update(config["extra_headers"])
+
+        async with httpx.AsyncClient(timeout=15) as client:
+            if config["method"] == "GET":
+                resp = await client.get(url, headers=headers)
+            else:
+                headers["Content-Type"] = "application/json"
+                resp = await client.post(url, json=config.get("body", {}), headers=headers)
+
+        if resp.status_code < 400:
+            return TestKeyResponse(key_name=body.key_name, success=True, message=f"Connected successfully (HTTP {resp.status_code}).")
+        else:
+            detail = ""
+            try:
+                err = resp.json()
+                detail = err.get("error", {}).get("message", "") or err.get("message", "") or str(err)[:200]
+            except Exception:
+                detail = resp.text[:200]
+            return TestKeyResponse(key_name=body.key_name, success=False, message=f"HTTP {resp.status_code}: {detail}")
+
+    except httpx.TimeoutException:
+        return TestKeyResponse(key_name=body.key_name, success=False, message="Connection timed out.")
+    except Exception as e:
+        return TestKeyResponse(key_name=body.key_name, success=False, message=f"Error: {str(e)[:200]}")
