@@ -59,11 +59,16 @@ async def upsert_user(db: AsyncSession, google_user: dict) -> User:
     user = result.scalar_one_or_none()
 
     if user is None:
+        from sqlalchemy import func
+        count_result = await db.execute(select(func.count()).select_from(User))
+        is_first_user = count_result.scalar() == 0
+
         user = User(
             email=google_user["email"],
             name=google_user.get("name", google_user["email"]),
             avatar_url=google_user.get("picture"),
             google_id=google_user["id"],
+            is_superadmin=is_first_user,
         )
         db.add(user)
         await db.flush()
