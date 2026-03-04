@@ -33,4 +33,11 @@ celery.conf.update(
     },
 )
 
-celery.autodiscover_tasks(["app.tasks"])
+celery.conf.update(
+    include=[
+        "app.tasks.pipeline",
+        "app.tasks.media",
+        "app.tasks.assembly",
+        "app.tasks.cleanup",
+    ]
+)
