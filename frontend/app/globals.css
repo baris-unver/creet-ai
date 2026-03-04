@@ -53,3 +53,81 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Landing page custom styles */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.4); }
+}
+
+.animate-fade-up { animation: fadeUp 0.6s ease both; }
+.animate-fade-up-1 { animation: fadeUp 0.6s 0.1s ease both; }
+.animate-fade-up-2 { animation: fadeUp 0.6s 0.2s ease both; }
+.animate-fade-up-3 { animation: fadeUp 0.6s 0.3s ease both; }
+.animate-fade-up-4 { animation: fadeUp 0.6s 0.4s ease both; }
+.animate-fade-up-5 { animation: fadeUp 0.6s 0.5s ease both; }
+
+.animate-pulse-dot { animation: pulse-dot 2s ease infinite; }
+
+.landing-grid-bg {
+  background-image:
+    linear-gradient(hsl(var(--primary) / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--primary) / 0.05) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+}
+
+.grad-text {
+  background: linear-gradient(135deg, #9D5FFF 0%, #F0338A 55%, #FF8C42 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.grad-logo {
+  background: linear-gradient(135deg, #9D5FFF, #F0338A);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.grad-label {
+  background: linear-gradient(90deg, #9D5FFF, #F0338A);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.grad-step-num {
+  background: linear-gradient(135deg, rgba(157,95,255,0.4), rgba(240,51,138,0.2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.btn-hero-gradient {
+  background: linear-gradient(135deg, #7C3AED, #F0338A);
+  box-shadow: 0 0 40px rgba(124,58,237,0.45);
+  transition: all 0.2s;
+}
+
+.btn-hero-gradient:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 60px rgba(124,58,237,0.65);
+}
+
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.reveal-on-scroll.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
