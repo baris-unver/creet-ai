@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Shield, Key, Eye, EyeOff, Save, Trash2,
-  CheckCircle2, XCircle, Zap, Loader2,
+  CheckCircle2, XCircle, Zap, Loader2, FlaskConical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,10 @@ export default function AdminSettingsPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [testing, setTesting] = useState<Record<string, boolean>>({});
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
+  const [pipelineTest, setPipelineTest] = useState<{
+    running: boolean;
+    result: { overall_success: boolean; steps: Array<{ step: string; success: boolean; message: string; detail?: string }> } | null;
+  }>({ running: false, result: null });
 
   useEffect(() => {
     api.get<User>("/auth/me").then((u) => {
@@ -253,6 +257,82 @@ export default function AdminSettingsPage() {
         <Save className="mr-2 h-4 w-4" />
         {saving ? "Saving..." : "Save All Keys"}
       </Button>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FlaskConical className="h-5 w-5" />
+            Pipeline Diagnostic Test
+          </CardTitle>
+          <CardDescription>
+            Tests the full pipeline flow: reads key from DB, decrypts, authenticates with OpenAI,
+            runs a dummy chat completion, resolves the provider registry, and generates a test outline.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button
+            onClick={async () => {
+              setPipelineTest({ running: true, result: null });
+              try {
+                const r = await api.post<typeof pipelineTest.result>("/admin/pipeline/test", {});
+                setPipelineTest({ running: false, result: r });
+              } catch {
+                setPipelineTest({ running: false, result: { overall_success: false, steps: [{ step: "Request", success: false, message: "Failed to reach test endpoint." }] } });
+              }
+            }}
+            disabled={pipelineTest.running}
+            variant="outline"
+            className="w-full"
+          >
+            {pipelineTest.running ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <FlaskConical className="mr-2 h-4 w-4" />
+            )}
+            {pipelineTest.running ? "Running diagnostic..." : "Run Pipeline Test"}
+          </Button>
+
+          {pipelineTest.result && (
+            <div className="space-y-2">
+              {pipelineTest.result.steps.map((step, i) => (
+                <div
+                  key={i}
+                  className={`rounded-lg border px-4 py-3 ${
+                    step.success
+                      ? "border-green-500/30 bg-green-500/5"
+                      : "border-red-500/30 bg-red-500/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {step.success ? (
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
+                    ) : (
+                      <XCircle className="h-4 w-4 shrink-0 text-red-500" />
+                    )}
+                    <span className="text-sm font-medium">{step.step}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground ml-6">{step.message}</p>
+                  {step.detail && (
+                    <pre className="mt-1.5 ml-6 text-xs text-muted-foreground bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap">
+                      {step.detail}
+                    </pre>
+                  )}
+                </div>
+              ))}
+
+              <div className={`mt-3 rounded-lg border px-4 py-3 text-center font-medium ${
+                pipelineTest.result.overall_success
+                  ? "border-green-500/30 bg-green-500/10 text-green-500"
+                  : "border-red-500/30 bg-red-500/10 text-red-500"
+              }`}>
+                {pipelineTest.result.overall_success
+                  ? "All checks passed — pipeline is ready."
+                  : "Pipeline test failed — fix the issue above and retry."}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

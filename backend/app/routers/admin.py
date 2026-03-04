@@ -1,4 +1,5 @@
 import httpx
+import traceback
 from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -202,3 +203,197 @@ async def test_system_key(body: TestKeyRequest, db: DB, admin: SuperAdmin):
         return TestKeyResponse(key_name=body.key_name, success=False, message="Connection timed out.")
     except Exception as e:
         return TestKeyResponse(key_name=body.key_name, success=False, message=f"Error: {str(e)[:200]}")
+
+
+class DiagnosticStep(BaseModel):
+    step: str
+    success: bool
+    message: str
+    detail: str | None = None
+
+
+class PipelineDiagnosticResponse(BaseModel):
+    overall_success: bool
+    steps: list[DiagnosticStep]
+
+
+@router.post("/pipeline/test", response_model=PipelineDiagnosticResponse)
+async def test_pipeline(db: DB, admin: SuperAdmin):
+    steps: list[DiagnosticStep] = []
+
+    # Step 1: Check if openai_api_key exists in system_settings
+    result = await db.execute(select(SystemSetting).where(SystemSetting.key == "openai_api_key"))
+    setting = result.scalar_one_or_none()
+    if not setting or not setting.value_enc:
+        steps.append(DiagnosticStep(
+            step="Read OpenAI key from DB",
+            success=False,
+            message="No openai_api_key found in system_settings table.",
+        ))
+        return PipelineDiagnosticResponse(overall_success=False, steps=steps)
+
+    steps.append(DiagnosticStep(
+        step="Read OpenAI key from DB",
+        success=True,
+        message="Key found in system_settings.",
+    ))
+
+    # Step 2: Decrypt the key
+    try:
+        api_key = decrypt_value(setting.value_enc)
+        masked = f"{api_key[:8]}...{api_key[-4:]}" if len(api_key) > 12 else "***"
+        steps.append(DiagnosticStep(
+            step="Decrypt API key",
+            success=True,
+            message=f"Decrypted successfully. Key preview: {masked}",
+        ))
+    except Exception as e:
+        steps.append(DiagnosticStep(
+            step="Decrypt API key",
+            success=False,
+            message=f"Decryption failed: {str(e)[:200]}",
+        ))
+        return PipelineDiagnosticResponse(overall_success=False, steps=steps)
+
+    # Step 3: Test OpenAI models endpoint (lightweight)
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                "https://api.openai.com/v1/models",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+        if resp.status_code == 200:
+            steps.append(DiagnosticStep(
+                step="OpenAI API auth (GET /v1/models)",
+                success=True,
+                message=f"HTTP {resp.status_code} — API key is valid.",
+            ))
+        else:
+            detail = ""
+            try:
+                err = resp.json()
+                detail = err.get("error", {}).get("message", resp.text[:200])
+            except Exception:
+                detail = resp.text[:200]
+            steps.append(DiagnosticStep(
+                step="OpenAI API auth (GET /v1/models)",
+                success=False,
+                message=f"HTTP {resp.status_code} — key rejected.",
+                detail=detail,
+            ))
+            return PipelineDiagnosticResponse(overall_success=False, steps=steps)
+    except Exception as e:
+        steps.append(DiagnosticStep(
+            step="OpenAI API auth (GET /v1/models)",
+            success=False,
+            message=f"Connection error: {str(e)[:200]}",
+        ))
+        return PipelineDiagnosticResponse(overall_success=False, steps=steps)
+
+    # Step 4: Test a real chat completion (tiny request)
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "gpt-4o",
+                    "messages": [
+                        {"role": "system", "content": "Reply with exactly: OK"},
+                        {"role": "user", "content": "Test"},
+                    ],
+                    "max_tokens": 5,
+                },
+            )
+        if resp.status_code == 200:
+            data = resp.json()
+            reply = data["choices"][0]["message"]["content"]
+            steps.append(DiagnosticStep(
+                step="OpenAI chat completion (GPT-4o)",
+                success=True,
+                message=f"Got response: \"{reply}\"",
+            ))
+        else:
+            detail = ""
+            try:
+                err = resp.json()
+                detail = err.get("error", {}).get("message", resp.text[:300])
+            except Exception:
+                detail = resp.text[:300]
+            steps.append(DiagnosticStep(
+                step="OpenAI chat completion (GPT-4o)",
+                success=False,
+                message=f"HTTP {resp.status_code}",
+                detail=detail,
+            ))
+            return PipelineDiagnosticResponse(overall_success=False, steps=steps)
+    except Exception as e:
+        steps.append(DiagnosticStep(
+            step="OpenAI chat completion (GPT-4o)",
+            success=False,
+            message=f"Error: {str(e)[:200]}",
+        ))
+        return PipelineDiagnosticResponse(overall_success=False, steps=steps)
+
+    # Step 5: Test provider registry resolution (sync, simulating celery)
+    try:
+        from app.database import SyncSessionLocal
+        from app.providers.registry import get_llm_provider_for_team
+
+        sync_db = SyncSessionLocal()
+        try:
+            # Use a dummy team_id — the registry will fall back to system key
+            import uuid
+            provider = get_llm_provider_for_team(sync_db, uuid.uuid4())
+            key_preview = f"{provider.api_key[:8]}...{provider.api_key[-4:]}" if len(provider.api_key) > 12 else "***"
+            steps.append(DiagnosticStep(
+                step="Provider registry (sync DB)",
+                success=True,
+                message=f"Resolved provider: {type(provider).__name__}, key: {key_preview}",
+            ))
+        finally:
+            sync_db.close()
+    except Exception as e:
+        steps.append(DiagnosticStep(
+            step="Provider registry (sync DB)",
+            success=False,
+            message=f"Failed: {str(e)[:200]}",
+            detail=traceback.format_exc()[-500:],
+        ))
+        return PipelineDiagnosticResponse(overall_success=False, steps=steps)
+
+    # Step 6: Test outline generation with dummy brief (via provider)
+    try:
+        from app.database import SyncSessionLocal
+        from app.providers.registry import get_llm_provider_for_team
+
+        sync_db = SyncSessionLocal()
+        try:
+            import uuid
+            provider = get_llm_provider_for_team(sync_db, uuid.uuid4())
+            result = provider.generate_sync(
+                "You are a video production assistant. Reply with a short 2-line outline.",
+                "Create a 30-second video about a cat playing piano.",
+                max_tokens=100,
+            )
+            steps.append(DiagnosticStep(
+                step="Dummy outline generation",
+                success=True,
+                message=f"Generated {len(result)} chars.",
+                detail=result[:300],
+            ))
+        finally:
+            sync_db.close()
+    except Exception as e:
+        steps.append(DiagnosticStep(
+            step="Dummy outline generation",
+            success=False,
+            message=f"Failed: {str(e)[:200]}",
+            detail=traceback.format_exc()[-500:],
+        ))
+        return PipelineDiagnosticResponse(overall_success=False, steps=steps)
+
+    return PipelineDiagnosticResponse(overall_success=True, steps=steps)
