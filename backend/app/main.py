@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import auth, teams, projects, pipeline, scenes, characters, locations, exports, settings as team_settings_router, websocket, legal
+from app.routers import admin, auth, teams, projects, pipeline, scenes, characters, locations, exports, settings as team_settings_router, websocket, legal
 
 
 @asynccontextmanager
@@ -30,6 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(team_settings_router.router, prefix="/api/teams", tags=["team-settings"])

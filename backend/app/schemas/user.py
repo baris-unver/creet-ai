@@ -15,3 +15,4 @@ class UserResponse(BaseModel):
 
 class UserWithPolicy(UserResponse):
     has_accepted_current_policy: bool = False
+    is_superadmin: bool = False

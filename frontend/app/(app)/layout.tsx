@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Film, LogOut, Settings, Users, FolderOpen, Bell } from "lucide-react";
+import { Film, LogOut, Settings, Users, FolderOpen, Bell, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { api } from "@/lib/api";
@@ -60,6 +60,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Link href="/invitations" className="text-sm text-muted-foreground hover:text-foreground">
                 <Bell className="mr-1 inline h-4 w-4" />Invitations
               </Link>
+              {user?.is_superadmin && (
+                <Link href="/admin/settings" className="text-sm text-muted-foreground hover:text-foreground">
+                  <Shield className="mr-1 inline h-4 w-4" />Admin
+                </Link>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-3">

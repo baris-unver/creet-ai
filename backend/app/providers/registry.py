@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from app.config import get_settings
 from app.models.team import TeamSettings
+from app.models.user import SystemSetting
 from app.providers.llm.base import LLMProvider
 from app.providers.llm.openai import OpenAIProvider
 from app.providers.llm.anthropic import AnthropicProvider
@@ -31,13 +31,13 @@ TTS_PROVIDERS = {
     "openai": OpenAITTSProvider,
 }
 
-SYSTEM_KEY_MAP = {
-    "openai": "OPENAI_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "gemini": "GEMINI_API_KEY",
-    "dalle": "OPENAI_API_KEY",
-    "stability": "STABILITY_API_KEY",
-    "elevenlabs": "ELEVENLABS_API_KEY",
+PROVIDER_TO_SYSTEM_KEY = {
+    "openai": "openai_api_key",
+    "anthropic": "anthropic_api_key",
+    "gemini": "gemini_api_key",
+    "dalle": "openai_api_key",
+    "stability": "stability_api_key",
+    "elevenlabs": "elevenlabs_api_key",
 }
 
 
@@ -46,21 +46,30 @@ def _get_team_settings(db: Session, team_id) -> TeamSettings | None:
     return result.scalar_one_or_none()
 
 
-def _resolve_key(ts: TeamSettings | None, provider_name: str, key_field: str) -> str:
-    settings = get_settings()
+def _get_system_key(db: Session, key_name: str) -> str:
+    result = db.execute(select(SystemSetting).where(SystemSetting.key == key_name))
+    setting = result.scalar_one_or_none()
+    if setting and setting.value_enc:
+        return decrypt_value(setting.value_enc)
+    return ""
+
+
+def _resolve_key(db: Session, ts: TeamSettings | None, provider_name: str, key_field: str) -> str:
     if ts:
         enc_key = getattr(ts, key_field, None)
         if enc_key:
             return decrypt_value(enc_key)
 
-    system_key_attr = SYSTEM_KEY_MAP.get(provider_name, "")
-    return getattr(settings, system_key_attr, "")
+    system_key_name = PROVIDER_TO_SYSTEM_KEY.get(provider_name, "")
+    if system_key_name:
+        return _get_system_key(db, system_key_name)
+    return ""
 
 
 def get_llm_provider_for_team(db: Session, team_id) -> LLMProvider:
     ts = _get_team_settings(db, team_id)
     provider_name = (ts.llm_provider if ts and ts.llm_provider else "openai")
-    api_key = _resolve_key(ts, provider_name, "llm_api_key_enc")
+    api_key = _resolve_key(db, ts, provider_name, "llm_api_key_enc")
     provider_cls = LLM_PROVIDERS.get(provider_name, OpenAIProvider)
     return provider_cls(api_key=api_key)
 
@@ -68,7 +77,7 @@ def get_llm_provider_for_team(db: Session, team_id) -> LLMProvider:
 def get_image_provider_for_team(db: Session, team_id) -> ImageProvider:
     ts = _get_team_settings(db, team_id)
     provider_name = (ts.image_provider if ts and ts.image_provider else "dalle")
-    api_key = _resolve_key(ts, provider_name, "image_api_key_enc")
+    api_key = _resolve_key(db, ts, provider_name, "image_api_key_enc")
     provider_cls = IMAGE_PROVIDERS.get(provider_name, DalleProvider)
     return provider_cls(api_key=api_key)
 
@@ -76,6 +85,6 @@ def get_image_provider_for_team(db: Session, team_id) -> ImageProvider:
 def get_tts_provider_for_team(db: Session, team_id) -> TTSProvider:
     ts = _get_team_settings(db, team_id)
     provider_name = (ts.tts_provider if ts and ts.tts_provider else "elevenlabs")
-    api_key = _resolve_key(ts, provider_name, "tts_api_key_enc")
+    api_key = _resolve_key(db, ts, provider_name, "tts_api_key_enc")
     provider_cls = TTS_PROVIDERS.get(provider_name, ElevenLabsProvider)
     return provider_cls(api_key=api_key)

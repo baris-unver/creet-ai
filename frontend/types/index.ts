@@ -5,6 +5,18 @@ export interface User {
   avatar_url: string | null;
   created_at: string;
   has_accepted_current_policy?: boolean;
+  is_superadmin?: boolean;
+}
+
+export interface SystemKeyStatus {
+  key: string;
+  label: string;
+  description: string;
+  is_set: boolean;
+}
+
+export interface SystemKeysResponse {
+  keys: SystemKeyStatus[];
 }
 
 export interface Team {

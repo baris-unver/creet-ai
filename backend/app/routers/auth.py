@@ -89,6 +89,7 @@ async def get_me(
         avatar_url=current_user.avatar_url,
         created_at=current_user.created_at,
         has_accepted_current_policy=accepted,
+        is_superadmin=current_user.is_superadmin,
     )
 
 

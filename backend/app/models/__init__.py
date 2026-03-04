@@ -1,4 +1,4 @@
-from app.models.user import User
+from app.models.user import User, SystemSetting
 from app.models.team import Team, TeamMember, TeamInvitation, TeamSettings
 from app.models.project import Project, ProjectLock
 from app.models.scene import Scene, SceneCharacter, SceneLocation
@@ -11,7 +11,7 @@ from app.models.usage import UsageEvent, CreditBalance
 from app.models.policy import PolicyAcceptance
 
 __all__ = [
-    "User",
+    "User", "SystemSetting",
     "Team", "TeamMember", "TeamInvitation", "TeamSettings",
     "Project", "ProjectLock",
     "Scene", "SceneCharacter", "SceneLocation",

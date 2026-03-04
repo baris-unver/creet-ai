@@ -78,6 +78,13 @@ def require_role(*roles: TeamRole):
     return _check
 
 
+async def require_superadmin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_superadmin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superadmin access required")
+    return current_user
+
+
 DB = Annotated[AsyncSession, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 CurrentTeam = Annotated[Team, Depends(get_team)]
+SuperAdmin = Annotated[User, Depends(require_superadmin)]
