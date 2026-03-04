@@ -13,6 +13,6 @@ celery[redis]==5.4.0
 redis==5.2.1
 minio==7.2.12
 ffmpeg-python==0.2.0
-resend==2.5.0
+resend==2.23.0
 python-multipart==0.0.20
 websockets==14.1
