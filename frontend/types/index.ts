@@ -198,8 +198,13 @@ export const STAGE_LABELS: Record<PipelineStage, string> = {
   scenario: "Scenario",
   scenes: "Scenes",
   characters: "Characters",
-  media_generation: "Media",
+  media_generation: "Media Generation",
   review: "Review",
-  assembly: "Assembly",
+  assembly: "Export",
   complete: "Complete",
 };
+
+export const VISIBLE_STAGES: PipelineStage[] = [
+  "brief", "outline", "scenario", "scenes", "characters",
+  "media_generation", "review",
+];

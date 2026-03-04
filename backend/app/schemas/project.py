@@ -15,6 +15,8 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=500)
     brief: str | None = Field(None, min_length=10, max_length=10000)
+    format: VideoFormat | None = None
+    duration_tier: DurationTier | None = None
 
 
 class ProjectResponse(BaseModel):

@@ -90,6 +90,14 @@ async def update_project(
         project.title = body.title
     if body.brief is not None:
         project.brief = body.brief
+    if body.format is not None:
+        if project.pipeline_stage != PipelineStage.BRIEF:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Format can only be changed during the brief stage")
+        project.format = body.format
+    if body.duration_tier is not None:
+        if project.pipeline_stage != PipelineStage.BRIEF:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Duration can only be changed during the brief stage")
+        project.duration_tier = body.duration_tier
 
     await db.commit()
     await db.refresh(project)

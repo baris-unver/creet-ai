@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { Eye, CheckCircle, Image as ImageIcon, Volume2, Loader2 } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { Eye, CheckCircle, Image as ImageIcon, Volume2, Loader2, ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 export default function ReviewPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
+  const router = useRouter();
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
   const [approving, setApproving] = useState(false);
@@ -41,14 +42,14 @@ export default function ReviewPage() {
     }
   }, [lastMessage, loadData]);
 
-  const handleApproveForAssembly = async () => {
+  const handleApproveAndExport = async () => {
     setApproving(true);
     try {
       await api.post(`${basePath}/pipeline/action`, {
         action: "approve",
         stage: "review",
       });
-      loadData();
+      router.push(`/teams/${teamId}/projects/${projectId}/export`);
     } finally {
       setApproving(false);
     }
@@ -71,7 +72,7 @@ export default function ReviewPage() {
           {stageStatus && <Badge variant="outline" className="capitalize">{stageStatus.replace("_", " ")}</Badge>}
         </div>
         <Button
-          onClick={handleApproveForAssembly}
+          onClick={handleApproveAndExport}
           disabled={approving || stageStatus === "approved"}
         >
           {approving ? (
@@ -79,7 +80,8 @@ export default function ReviewPage() {
           ) : (
             <CheckCircle className="mr-2 h-4 w-4" />
           )}
-          Approve for Assembly
+          Approve and Export
+          <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
 
@@ -98,7 +100,7 @@ export default function ReviewPage() {
       {!allScenesApproved && scenes.length > 0 && (
         <Card className="border-yellow-500/50">
           <CardContent className="py-4 text-sm text-yellow-500">
-            Some scenes or assets are not yet approved. Review each scene below before approving for assembly.
+            Some scenes or assets are not yet approved. Review each scene below before approving for export.
           </CardContent>
         </Card>
       )}

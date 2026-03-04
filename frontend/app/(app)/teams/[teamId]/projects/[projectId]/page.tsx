@@ -12,7 +12,7 @@ import { api } from "@/lib/api";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useLock } from "@/hooks/use-lock";
 import type { Project, PipelineStatus, ProgressMessage } from "@/types";
-import { PIPELINE_STAGES, STAGE_LABELS } from "@/types";
+import { VISIBLE_STAGES, STAGE_LABELS } from "@/types";
 
 const STATUS_ICONS: Record<string, React.ReactNode> = {
   approved: <CheckCircle className="h-5 w-5 text-green-500" />,
@@ -51,29 +51,52 @@ export default function ProjectPage() {
 
   const stageLink = (stage: string) => `/teams/${teamId}/projects/${projectId}/${stage === "media_generation" ? "media" : stage}`;
 
+  const currentStage = pipeline.current_stage;
+  const continueLink = currentStage === "complete"
+    ? `/teams/${teamId}/projects/${projectId}/export`
+    : stageLink(currentStage);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">{project.title}</h1>
           <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-            <Badge variant="secondary">{project.format}</Badge>
+            <Badge variant="secondary">{project.format.replace("_", " ")}</Badge>
             <Badge variant="outline">{project.duration_tier}</Badge>
             {connected && <Badge variant="success" className="text-xs">Live</Badge>}
           </div>
         </div>
         <div className="flex items-center gap-2">
           {isOwner ? (
-            <Button variant="outline" onClick={releaseLock}>
+            <Button variant="outline" size="sm" onClick={releaseLock}>
               <Unlock className="mr-2 h-4 w-4" />Release Lock
             </Button>
           ) : (
-            <Button onClick={acquireLock}>
+            <Button variant="outline" size="sm" onClick={acquireLock}>
               <Lock className="mr-2 h-4 w-4" />Acquire Lock
             </Button>
           )}
         </div>
       </div>
+
+      <Link href={continueLink}>
+        <Card className="cursor-pointer border-primary/50 bg-primary/5 hover:bg-primary/10 transition-colors">
+          <CardContent className="flex items-center justify-between py-5">
+            <div>
+              <p className="font-semibold text-lg">
+                {currentStage === "complete" ? "Project Complete — View Exports" : `Continue: ${STAGE_LABELS[currentStage] || currentStage}`}
+              </p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {currentStage === "complete"
+                  ? "Your video is ready. Go to the export page to download."
+                  : "Pick up where you left off."}
+              </p>
+            </div>
+            <ArrowRight className="h-5 w-5 text-primary" />
+          </CardContent>
+        </Card>
+      </Link>
 
       {progress && progress.status === "running" && (
         <Card className="border-primary/50">
@@ -88,7 +111,7 @@ export default function ProjectPage() {
       )}
 
       <div className="space-y-3">
-        {PIPELINE_STAGES.filter((s) => s !== "complete").map((stage, idx) => {
+        {VISIBLE_STAGES.map((stage, idx) => {
           const status = pipeline.pipeline_state[stage] || "pending";
           const isCurrent = pipeline.current_stage === stage;
           return (
@@ -96,7 +119,9 @@ export default function ProjectPage() {
               <Card className={`cursor-pointer transition-colors hover:bg-accent/50 ${isCurrent ? "border-primary" : ""}`}>
                 <CardContent className="flex items-center justify-between py-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
+                      status === "approved" ? "bg-green-500/10 text-green-600" : isCurrent ? "bg-primary/10 text-primary" : "bg-muted"
+                    }`}>
                       {idx + 1}
                     </div>
                     <div>

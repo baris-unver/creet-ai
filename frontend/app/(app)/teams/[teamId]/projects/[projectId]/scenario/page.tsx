@@ -133,7 +133,7 @@ export default function ScenarioPage() {
         </Button>
         <Button onClick={handleApprove} disabled={generating || stageStatus === "approved"}>
           <CheckCircle className="mr-2 h-4 w-4" />
-          Approve
+          Approve and Generate Scenes
         </Button>
         <Button variant="secondary" onClick={handleRegenerate} disabled={generating}>
           {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}

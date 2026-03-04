@@ -33,8 +33,14 @@ async def pipeline_action(
     _member=Depends(require_role(TeamRole.OWNER, TeamRole.ADMIN, TeamRole.MEMBER)),
 ):
     if body.action == "generate":
-        from app.tasks.pipeline import run_pipeline_stage
-        task = run_pipeline_stage.delay(str(project_id), str(team_id), body.stage.value)
+        if body.stage == PipelineStage.MEDIA_GENERATION:
+            from app.tasks.media import generate_scene_media
+            task = generate_scene_media.delay(str(project_id), str(team_id))
+        elif body.stage == PipelineStage.ASSEMBLY:
+            return {"status": "error", "detail": "Use the Export page to assemble videos"}
+        else:
+            from app.tasks.pipeline import run_pipeline_stage
+            task = run_pipeline_stage.delay(str(project_id), str(team_id), body.stage.value)
         return {"task_id": task.id, "status": "queued"}
     elif body.action == "approve":
         result = await advance_stage(db, project_id, team_id, body.stage)

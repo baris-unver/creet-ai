@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { Users, MapPin, Sparkles, Save, Trash2, Loader2 } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { Users, MapPin, Sparkles, Save, Trash2, Loader2, CheckCircle, ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import type { Character, Location, PipelineStatus, ProgressMessage } from "@/typ
 
 export default function CharactersPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
+  const router = useRouter();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
@@ -165,6 +166,25 @@ export default function CharactersPage() {
           ))}
         </TabsContent>
       </Tabs>
+
+      {(characters.length > 0 || locations.length > 0) && stageStatus !== "approved" && (
+        <div className="flex gap-3 pt-2">
+          <Button
+            onClick={async () => {
+              const result = await api.post<{ next_stage: string }>(
+                `${basePath}/pipeline/action`,
+                { action: "approve", stage: "characters" },
+              );
+              router.push(`/teams/${teamId}/projects/${projectId}/media`);
+            }}
+            disabled={generating}
+          >
+            <CheckCircle className="mr-2 h-4 w-4" />
+            Approve and Generate Media
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

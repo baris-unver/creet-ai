@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { Image as ImageIcon, Volume2, Sparkles, CheckCircle, RefreshCw, Loader2 } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { Image as ImageIcon, Volume2, Sparkles, CheckCircle, RefreshCw, Loader2, ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 export default function MediaPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
+  const router = useRouter();
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -168,6 +169,25 @@ export default function MediaPage() {
           );
         })}
       </div>
+
+      {scenes.length > 0 && stageStatus !== "approved" && (
+        <div className="flex gap-3 pt-2">
+          <Button
+            onClick={async () => {
+              await api.post(`${basePath}/pipeline/action`, {
+                action: "approve",
+                stage: "media_generation",
+              });
+              router.push(`/teams/${teamId}/projects/${projectId}/review`);
+            }}
+            disabled={generating}
+          >
+            <CheckCircle className="mr-2 h-4 w-4" />
+            Approve and Submit for Review
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

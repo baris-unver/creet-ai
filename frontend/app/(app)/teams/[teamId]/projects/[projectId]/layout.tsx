@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import {
   FileText, ListOrdered, BookOpen, Film, Users2,
-  Image, Eye, Clapperboard, Download, ChevronLeft,
+  Image, Eye, Download, ChevronLeft,
   CheckCircle, Circle, Loader2, AlertCircle,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -19,7 +19,6 @@ const STAGES = [
   { key: "characters", icon: Users2, label: "Characters", path: "characters" },
   { key: "media_generation", icon: Image, label: "Media", path: "media" },
   { key: "review", icon: Eye, label: "Review", path: "review" },
-  { key: "assembly", icon: Clapperboard, label: "Assembly", path: "assembly" },
   { key: "complete", icon: Download, label: "Export", path: "export" },
 ];
 

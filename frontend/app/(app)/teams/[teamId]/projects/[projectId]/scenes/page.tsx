@@ -121,7 +121,7 @@ export default function ScenesPage() {
           {scenes.length > 0 && (
             <Button variant="secondary" onClick={handleApproveAll}>
               <CheckCheck className="mr-2 h-4 w-4" />
-              Approve All
+              Approve All and Generate Characters
             </Button>
           )}
         </div>

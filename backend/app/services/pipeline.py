@@ -38,14 +38,22 @@ async def advance_stage(
     state = dict(project.pipeline_state)
     state[stage.value] = "approved"
 
-    current_idx = STAGE_ORDER.index(stage)
-    if current_idx + 1 < len(STAGE_ORDER):
-        next_stage = STAGE_ORDER[current_idx + 1]
-        project.pipeline_stage = next_stage
-        if next_stage.value in state and state[next_stage.value] == "pending":
-            pass
-    else:
+    # When review is approved, auto-approve assembly and jump to complete
+    if stage == PipelineStage.REVIEW:
+        state[PipelineStage.ASSEMBLY.value] = "approved"
         project.pipeline_stage = PipelineStage.COMPLETE
+    else:
+        current_idx = STAGE_ORDER.index(stage)
+        if current_idx + 1 < len(STAGE_ORDER):
+            next_stage = STAGE_ORDER[current_idx + 1]
+            # Skip assembly stage — export page handles it
+            if next_stage == PipelineStage.ASSEMBLY:
+                state[PipelineStage.ASSEMBLY.value] = "approved"
+                project.pipeline_stage = PipelineStage.COMPLETE
+            else:
+                project.pipeline_stage = next_stage
+        else:
+            project.pipeline_stage = PipelineStage.COMPLETE
 
     project.pipeline_state = state
     await db.commit()
