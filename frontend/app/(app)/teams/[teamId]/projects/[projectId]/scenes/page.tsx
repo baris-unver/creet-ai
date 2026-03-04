@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Film, Sparkles, CheckCircle, CheckCheck, Save, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -14,6 +14,7 @@ import type { Scene, PipelineStatus, ProgressMessage } from "@/types";
 
 export default function ScenesPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
+  const router = useRouter();
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -90,12 +91,16 @@ export default function ScenesPage() {
         api.patch(`/teams/${teamId}/projects/${projectId}/scenes/${s.id}`, { status: "approved" })
       )
     );
-    await api.post(`/teams/${teamId}/projects/${projectId}/pipeline/action`, {
-      action: "approve",
-      stage: "scenes",
-    });
-    loadScenes();
-    api.get<PipelineStatus>(`/teams/${teamId}/projects/${projectId}/pipeline`).then(setPipeline);
+    const result = await api.post<{ next_stage: string; auto_generating?: boolean }>(
+      `/teams/${teamId}/projects/${projectId}/pipeline/action`,
+      { action: "approve", stage: "scenes" },
+    );
+    if (result.auto_generating && result.next_stage) {
+      router.push(`/teams/${teamId}/projects/${projectId}/${result.next_stage}`);
+    } else {
+      loadScenes();
+      api.get<PipelineStatus>(`/teams/${teamId}/projects/${projectId}/pipeline`).then(setPipeline);
+    }
   };
 
   const stageStatus = pipeline?.pipeline_state?.scenes;

@@ -38,7 +38,13 @@ async def pipeline_action(
         return {"task_id": task.id, "status": "queued"}
     elif body.action == "approve":
         result = await advance_stage(db, project_id, team_id, body.stage)
-        return {"status": "approved", "next_stage": result}
+        next_stage = result
+        auto_generate_stages = {"outline", "scenario", "scenes", "characters"}
+        if next_stage in auto_generate_stages:
+            from app.tasks.pipeline import run_pipeline_stage
+            task = run_pipeline_stage.delay(str(project_id), str(team_id), next_stage)
+            return {"status": "approved", "next_stage": next_stage, "task_id": task.id, "auto_generating": True}
+        return {"status": "approved", "next_stage": next_stage}
     elif body.action == "regenerate":
         await regenerate_stage(db, project_id, team_id, body.stage)
         from app.tasks.pipeline import run_pipeline_stage

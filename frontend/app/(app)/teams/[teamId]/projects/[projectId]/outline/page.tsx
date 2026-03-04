@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ListOrdered, CheckCircle, RefreshCw, Save, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -14,6 +14,7 @@ import type { Project, PipelineStatus, ProgressMessage } from "@/types";
 
 export default function OutlinePage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
+  const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
   const [content, setContent] = useState("");
@@ -54,11 +55,15 @@ export default function OutlinePage() {
   };
 
   const handleApprove = async () => {
-    await api.post(`/teams/${teamId}/projects/${projectId}/pipeline/action`, {
-      action: "approve",
-      stage: "outline",
-    });
-    api.get<PipelineStatus>(`/teams/${teamId}/projects/${projectId}/pipeline`).then(setPipeline);
+    const result = await api.post<{ next_stage: string; auto_generating?: boolean }>(
+      `/teams/${teamId}/projects/${projectId}/pipeline/action`,
+      { action: "approve", stage: "outline" },
+    );
+    if (result.auto_generating && result.next_stage) {
+      router.push(`/teams/${teamId}/projects/${projectId}/${result.next_stage}`);
+    } else {
+      api.get<PipelineStatus>(`/teams/${teamId}/projects/${projectId}/pipeline`).then(setPipeline);
+    }
   };
 
   const handleRegenerate = async () => {
