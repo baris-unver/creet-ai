@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Film, LogOut, Settings, Users, FolderOpen, Bell, Shield } from "lucide-react";
+import { LogOut, Users, FolderOpen, Bell, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useTranslation } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import type { User } from "@/types";
 
@@ -13,6 +16,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { t } = useTranslation();
 
   useEffect(() => {
     api.get<User>("/auth/me")
@@ -47,29 +51,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="container mx-auto flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-6">
             <Link href="/dashboard" className="flex items-center gap-2">
-              <Film className="h-5 w-5 text-primary" />
-              <span className="font-bold">VideoCraft</span>
+              <span className="font-bold">Creet</span>
             </Link>
             <nav className="hidden items-center gap-4 md:flex">
               <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
-                <FolderOpen className="mr-1 inline h-4 w-4" />Projects
+                <FolderOpen className="mr-1 inline h-4 w-4" />{t("nav.projects")}
               </Link>
               <Link href="/teams" className="text-sm text-muted-foreground hover:text-foreground">
-                <Users className="mr-1 inline h-4 w-4" />Teams
+                <Users className="mr-1 inline h-4 w-4" />{t("nav.teams")}
               </Link>
               <Link href="/invitations" className="text-sm text-muted-foreground hover:text-foreground">
-                <Bell className="mr-1 inline h-4 w-4" />Invitations
+                <Bell className="mr-1 inline h-4 w-4" />{t("nav.invitations")}
               </Link>
               {user?.is_superadmin && (
                 <Link href="/admin/settings" className="text-sm text-muted-foreground hover:text-foreground">
-                  <Shield className="mr-1 inline h-4 w-4" />Admin
+                  <Shield className="mr-1 inline h-4 w-4" />{t("nav.admin")}
                 </Link>
               )}
             </nav>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ThemeToggle />
             {user && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-2">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user.avatar_url || undefined} alt={user.name} />
                   <AvatarFallback>{user.name[0]}</AvatarFallback>
@@ -77,7 +82,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <span className="hidden text-sm md:inline">{user.name}</span>
               </div>
             )}
-            <Button variant="ghost" size="icon" onClick={handleLogout} title="Sign out">
+            <Button variant="ghost" size="icon" onClick={handleLogout} title={t("nav.signOut")}>
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
