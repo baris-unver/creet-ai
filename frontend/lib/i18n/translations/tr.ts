@@ -70,6 +70,6 @@ const tr = {
     cookies: "Çerezler",
     gdpr: "KVKK",
   },
-} as const;
+};
 
 export default tr;

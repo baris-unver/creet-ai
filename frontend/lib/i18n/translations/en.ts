@@ -70,6 +70,6 @@ const en = {
     cookies: "Cookies",
     gdpr: "GDPR",
   },
-} as const;
+};
 
 export default en;
